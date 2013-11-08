@@ -10,7 +10,6 @@ import org.ggp.base.player.event.PlayerDroppedPacketEvent;
 import org.ggp.base.player.event.PlayerReceivedMessageEvent;
 import org.ggp.base.player.event.PlayerSentMessageEvent;
 import org.ggp.base.player.gamer.Gamer;
-import org.ggp.base.player.gamer.clojure.stubs.NormanWeek4Player;
 import org.ggp.base.player.request.factory.RequestFactory;
 import org.ggp.base.player.request.grammar.Request;
 import org.ggp.base.util.http.HttpReader;
@@ -104,13 +103,14 @@ public final class GamePlayer extends Thread implements Subject
 	// so that the GamePlayer class doesn't have to import RandomGamer.
 	public static void main(String[] args)
 	{
-		if (args.length != 1) {
-			System.err.println("Usage: GamePlayer <port>");
+		if (args.length != 2) {
+			System.err.println("Usage: GamePlayer <port> class");
 			System.exit(1);
 		}
 		
 		try {
-			GamePlayer player = new GamePlayer(Integer.valueOf(args[0]), new NormanWeek4Player());
+			GamePlayer player = new GamePlayer(Integer.valueOf(args[0]), 
+						(Gamer) Class.forName(args[1]).newInstance());
 			player.run();
 		} catch (NumberFormatException e) {
 			System.err.println("Illegal port number: " + args[0]);			
@@ -120,6 +120,15 @@ public final class GamePlayer extends Thread implements Subject
 			System.err.println("IO Exception: " + e);			
 			e.printStackTrace();
 			System.exit(3);
+		} catch (InstantiationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 }

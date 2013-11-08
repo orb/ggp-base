@@ -4,14 +4,28 @@
            [org.ggp.base.util.game GameRepository]))
 
 
+(defn start-local-repository []
+  (org.ggp.base.util.game.LocalGameRepository.))
+(defn local-repository []
+  (org.ggp.base.util.game.CloudGameRepository. "localhost:9140"))
+
 (def repository (GameRepository/getDefaultRepository))
+(comment
+  (.getGameKeys repository))
+
 (defonce buttons-game (.getGame repository "buttons"))
+(defonce ttt-game (.getGame repository "tictactoe2"))
 
 (defn state-machine [game]
   (doto (ProverStateMachine.)
     (.initialize (.getRules game))))
 
+
+(defn local-game [name]
+  (state-machine (.getGame (local-repository) name)))
+
 (def buttons (state-machine buttons-game))
+(def ttt (state-machine ttt-game))
 
 (defn search [game state role]
      (if (.isTerminal game state)
@@ -30,7 +44,5 @@
     (search buttons state role)))
 
 
-(def final-state
-  (.performDepthCharge (.getStateMachine this)
-                       (first (.get (vals nextStates) 0))
-                       depth))
+
+
