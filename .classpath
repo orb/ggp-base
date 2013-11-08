@@ -18,5 +18,7 @@
 			<attribute name="optional" value="true"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="src/external/reflections/reflections-0.9.9-RC1.jar"/>
+	<classpathentry kind="lib" path="src/external/javassist/javassist.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
