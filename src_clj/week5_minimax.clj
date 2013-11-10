@@ -2,9 +2,7 @@
   (:import [org.ggp.base.player.gamer.statemachine StateMachineGamer]
            [org.ggp.base.util.statemachine.implementation.prover ProverStateMachine]))
 
-
-
-(def print-depth 2)
+(def print-depth 10)
 (defn spaces [n] (apply str (take n (repeat " "))))
 (defn log [depth & args]
   (when (< depth print-depth)
@@ -106,13 +104,16 @@
       (println "****************************************")
       (println "Making a move for" (.getRole this))
       (println "STATE:" (.getCurrentState this))
-      (let [state-machine (.getStateMachine this)
-            current-state (.getCurrentState this)
-            role          (.getRole this)
-            _ (reset! counts 0)
-            move (best-move state-machine current-state role)]
-        (println "SELECTING" role move "after" @counts "nodes")
-        move))
+      (let [start-time (System/currentTimeMillis)]
+        (let [state-machine (.getStateMachine this)
+              current-state (.getCurrentState this)
+              role          (.getRole this)
+              _ (reset! counts 0)
+              move (best-move state-machine current-state role)]
+          (println "SELECTING" role move "after" @counts "nodes")
+          (println "-- elapsed" (- (System/currentTimeMillis)
+                                   start-time))
+          move)))
 
     (stateMachineMetaGame [timeout]
       (println "SampleClojureGamer metagame called"))
