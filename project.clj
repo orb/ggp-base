@@ -3,11 +3,14 @@
   :source-paths ["src_clj"]
   :resource-paths ["bin"
                    "bin/external/Guava/*"
-                   "bin/external/Junit/*"]
+                   "bin/external/Junit/*"
+                   "bin/external/reflections/*"
+                   "bin/external/javassist/*"]
 
 
   :aliases {"kiosk"
             ["trampoline" "run" "-m" "org.ggp.base.apps.kiosk.Kiosk"]
+
             "minmax"
             ["trampoline" "run" "-m" "org.ggp.base.player.GamePlayer"
              "9147"
@@ -16,8 +19,11 @@
             "alphabeta"
             ["trampoline" "run" "-m" "org.ggp.base.player.GamePlayer"
              "9147"
-             "org.ggp.base.player.gamer.clojure.stubs.NormanWeek5PlayerAlphaBeta"]}
+             "org.ggp.base.player.gamer.clojure.stubs.NormanWeek5PlayerAlphaBeta"]
 
-)
+            "w6p1"
+            ["trampoline" "run" "-m" "org.ggp.base.player.GamePlayer"
+             "9147"
+             "org.ggp.base.player.gamer.clojure.stubs.NormanWeek6Player1"]})
 
 
