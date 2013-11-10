@@ -2,7 +2,7 @@
   (:import [org.ggp.base.player.gamer.statemachine StateMachineGamer]
            [org.ggp.base.util.statemachine.implementation.prover ProverStateMachine]))
 
-(def print-depth 10)
+(def print-depth 2)
 (defn spaces [n] (apply str (take n (repeat " "))))
 (defn log [depth & args]
   (when (< depth print-depth)

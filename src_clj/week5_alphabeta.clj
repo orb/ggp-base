@@ -2,7 +2,7 @@
   (:import [org.ggp.base.player.gamer.statemachine StateMachineGamer]
            [org.ggp.base.util.statemachine.implementation.prover ProverStateMachine]))
 
-(def print-depth 4)
+(def print-depth 5)
 (defn spaces [n] (apply str (take n (repeat " "))))
 (defn log [game-state & args]
   (let [depth (:depth game-state)]
@@ -31,20 +31,21 @@
 (defn next-state [game-state]
   (let [ordered-actions
         (for [role (.getRoles (:game game-state))]
-          (get-in game-state [:actions role]))]
+          (get-in game-state [:actions role]))
+        next-state
+        (.getNextState (:game game-state)
+                       (:state game-state)
+                       ordered-actions)]
 
     (-> game-state
-        (assoc :state
-          (.getNextState (:game game-state)
-                         (:state game-state)
-                         ordered-actions))
+        (assoc :state next-state)
         (assoc :last-actions ordered-actions)
         (dissoc :actions))))
 
 (defn move [game-state role action]
   (let [state
         (-> game-state
-            (update-in [:depth] inc)
+            (update-in [:depth] (fnil inc 0))
             (assoc-in [:actions role] action)
             (assoc-in [:last-actions] [action]))]
     (if (= 2 (count (:actions state)))
@@ -75,61 +76,69 @@
      (do
        ~@body)))
 
-(defn max-shortcut [current-max values]
-  (if (or (>= current-max 100)
-          (not (seq values)))
-    current-max
-    (recur (max current-max (first values))
-           (rest values))))
+;; (defn max-shortcut [current-max values]
+;;   (if (or (>= current-max 100)
+;;           (not (seq values)))
+;;     current-max
+;;     (recur (max current-max (first values))
+;;            (rest values))))
 
-(defn min-shortcut [current-min values]
-  (if (or (<= current-min 0)
-          (not (seq values)))
-    current-min
-    (recur (min current-min (first values))
-           (rest values))))
+;; (defn min-shortcut [current-min values]
+;;   (if (or (<= current-min 0)
+;;           (not (seq values)))
+;;     current-min
+;;     (recur (min current-min (first values))
+;;            (rest values))))
 
-
-(defn min-score [game-state]
+(defn min-score [alpha beta game-state]
   (bump! game-state)
-  (log game-state "MIN" (:last-actions game-state))
+  (log game-state "MIN" alpha beta (:last-actions game-state))
 
   (logging-depth
    [game-state "MIN VAL"]
    (unless-terminal game-state
-    (let [scores
-          (map #(max-score (move game-state (:opponent-role game-state) %))
-               (opponent-legal-moves game-state))]
-      (min-shortcut 100 scores)))))
+     (let [make-move #(move game-state (:opponent-role game-state) %)]
+       (loop [beta beta
+              next-moves (opponent-legal-moves game-state)]
+         (cond
+          (<= beta alpha) beta
+          (empty? next-moves) beta
+          :else (recur (min beta (max-score alpha beta (make-move (first next-moves))))
+                       (rest next-moves))))))))
 
 
-
-(defn max-score [game-state]
+(defn max-score [alpha beta game-state]
   (bump! game-state)
-  (log game-state "MAX" (:last-actions game-state))
+  (log game-state "MAX" alpha beta (:last-actions game-state))
 
-  (logging-depth
-   [game-state "MAX VAL"]
-   (unless-terminal game-state
-    (let [scores
-          (map #(min-score (move game-state (:role game-state) %))
-               (my-legal-moves game-state))]
-      (max-shortcut 0 scores)))))
+  (logging-depth [game-state "MAX VAL"]
+                 (unless-terminal game-state
+    (let [make-move #(move game-state (:role game-state) %)]
+      (loop [alpha alpha
+             next-moves (my-legal-moves game-state)]
+        (cond
+         (<= beta alpha) alpha
+         (empty? next-moves) alpha
+         :else (recur (max alpha (min-score alpha beta (make-move (first next-moves))))
+                      (rest next-moves))))))))
 
 
 (defn best-move [game-state]
-  (println "start" game-state)
   (let [actions (my-legal-moves game-state)]
     (if (= 1 (count actions))
       (first actions)
-      (let [better-state
-            #(max-key second %1 %2)
-
-            gen-tree
-            #(min-score (-> game-state
-                            (assoc :depth 0)
-                            (move (:role game-state) %)))]
-        (first (reduce better-state (map (juxt identity gen-tree) actions)))))))
+      (let [make-move #(move game-state (:role game-state) %)]
+        (loop [alpha 0
+               beta 100
+               my-move nil
+               next-moves (my-legal-moves game-state)]
+          (cond
+           (<= beta alpha) my-move
+           (empty? next-moves) my-move
+           :else (let [leaf-score (min-score alpha beta (make-move (first next-moves)))]
+                   (if (> leaf-score alpha)
+                     (recur leaf-score beta (first next-moves) (rest next-moves))
+                     (recur alpha beta my-move (rest next-moves))))))))))
 
 (defn test-solve [game]
   (let [counter (atom 0)
