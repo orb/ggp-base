@@ -59,9 +59,12 @@
                   (:role game-state)))
 
 (defn opponent-legal-moves [game-state]
-  (.getLegalMoves (:game game-state)
-                  (:state game-state)
-                  (:opponent-role game-state)))
+  (let [opponent-role
+        (or (:opponent-role game-state)
+            (find-opponent (:game game-state) (:role game-state)))]
+    (.getLegalMoves (:game game-state)
+                    (:state game-state)
+                    opponent-role)))
 
 
 ;; ----------------------------------------
