@@ -58,37 +58,14 @@
    (dfs-explore game-state)))
 
 
-;; Implement a bounded-depth search player, i.e. a heuristic search
-;; player with an evaluation function that returns actual rewards on
-;; terminal states and 0 for all other states. Use a depth of at least
-;; 2.
-(defn heuristic-zero [game-state]
-  (or (terminal-score game-state) 0))
-
-;; uses state goal as reward no matter what
-(defn heuristic-goal [game-state]
+(defn heuristic-mcs [game-state]
+  ;; stub for now...
   (.getGoal (:game game-state)
             (:state game-state)
             (:role game-state)))
 
-(defn heuristic-mobility [game-state]
-  (or (terminal-score game-state)
-      (count (my-legal-moves game-state))))
 
-(defn heuristic-focus [game-state]
-  (or (terminal-score game-state)
-      (- 10 (count (my-legal-moves game-state)))))
-
-(defn heuristic-mf-weighted [game-state]
-  (or (terminal-score game-state)
-      (let [my-moves (count (my-legal-moves game-state))
-            opponent-moves (count (opponent-legal-moves game-state))]
-        (int (+ 20
-                (* 2 my-moves)
-                (* -0.25 opponent-moves))))))
-
-
-(defn week6-player1 []
+(defn week7-montecarlo []
   (proxy [StateMachineGamer] []
     (getInitialStateMachine []
       (ProverStateMachine.))
@@ -100,12 +77,12 @@
       (let [counter (atom 0)
             initial-state {:game (.getStateMachine this)
                            :state (.getCurrentState this)
-                           :depth 0
-                           :print-depth 2
-                           :max-depth 6
-                           :heuristic heuristic-goal
+                           :role (.getRole this)
                            :count counter
-                           :role (.getRole this)}
+                           :depth 0
+                           :max-depth 6
+                           :print-depth 2
+                           :heuristic heuristic-mcs}
             scored (bounded-dfs initial-state)
             _ (println "!!! legal moves are" (my-legal-moves initial-state))
             move (:score-action scored)] ;; single player
