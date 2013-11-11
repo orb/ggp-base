@@ -1,4 +1,4 @@
-(ns ggp
+(ns ggp.repository
   (:import [org.ggp.base.player.gamer.statemachine StateMachineGamer]
            [org.ggp.base.util.statemachine.implementation.prover ProverStateMachine]
            [org.ggp.base.util.game GameRepository]))

@@ -1,155 +1,74 @@
 (ns gamer_namespace
-  (:import [org.ggp.base.player.gamer.statemachine StateMachineGamer]
+  (:require [ggp.util :refer :all]
+            [ggp.player :as player])
+  (:import[org.ggp.base.player.gamer.statemachine StateMachineGamer]
            [org.ggp.base.util.statemachine.implementation.prover ProverStateMachine]))
 
-(def print-depth 5)
-(defn spaces [n] (apply str (take n (repeat " "))))
-(defn log [game-state & args]
-  (let [depth (:depth game-state)]
-    (when (< depth print-depth)
-      (apply println (spaces depth) depth args))))
+;; Implement a bounded-depth search player, i.e. a heuristic search
+;; player with an evaluation function that returns actual rewards on
+;; terminal states and 0 for all other states. Use a depth of at least
+;; 2.
 
-(defmacro logging-depth [[game-state message] & body]
-  `(let [val# (do ~@body)]
-     (log ~game-state ~message val#)
-     val#))
+(defn hit-max-depth [game-state]
+  (>= (:depth game-state) (:max-depth game-state)))
 
-(defn find-opponent [game role]
-  (first (filter #(not (= role %)) (.getRoles game))))
+(defn call-heuristic [game-state]
+  (let [heuristic (:heuristic game-state)]
+    (heuristic game-state)))
 
-(defn my-legal-moves [game-state]
-  (.getLegalMoves (:game game-state)
-                  (:state game-state)
-                  (:role game-state)))
+(defn dfs-terminal [game-state]
+  (log game-state "TERMINAL" (call-heuristic game-state))
+  (assoc game-state :score (call-heuristic game-state)))
 
-(defn opponent-legal-moves [game-state]
-  (.getLegalMoves (:game game-state)
-                  (:state game-state)
-                  (:opponent-role game-state)))
+(defn select-role [game-state]
+  (let [all-roles (.getRoles (:game game-state))
+        needs-move (fn [role]
+                     (not (contains? (:actions game-state) role)))]
+    (first (filter needs-move all-roles))))
 
-;; applies moves for all roles
-(defn next-state [game-state]
-  (let [ordered-actions
-        (for [role (.getRoles (:game game-state))]
-          (get-in game-state [:actions role]))
-        next-state
-        (.getNextState (:game game-state)
-                       (:state game-state)
-                       ordered-actions)]
+(declare bounded-dfs)
 
-    (-> game-state
-        (assoc :state next-state)
-        (assoc :last-actions ordered-actions)
-        (dissoc :actions))))
+(defn dfs-explore [game-state]
+  (let [role (select-role game-state)]
+    (log game-state "EXPLORE" role (= role (:role game-state)))
+    (let [actions (legal-moves-for game-state role)
+          next-level (doall
+                      (for [action actions
+                            :let [make-move (move game-state role action)
+                                  searched (bounded-dfs make-move)]]
+                        [(:score searched) action]))
 
-(defn move [game-state role action]
-  (let [state
-        (-> game-state
-            (update-in [:depth] (fnil inc 0))
-            (assoc-in [:actions role] action)
-            (assoc-in [:last-actions] [action]))]
-    (if (= 2 (count (:actions state)))
-      (next-state state)
-      state)))
+          _ (log game-state "NEXT" next-level)
+          minormax (if (= role (:role game-state)) max-key min-key)
+          [score action] (apply minormax first next-level)
+          _ (log game-state "chosing[" score "]" action "using" minormax)]
+      (-> game-state
+          (assoc :score score)
+          (assoc :score-action action)))))
 
-(defn bump! [game-state]
-  (if (zero? (mod (swap! (:count game-state) inc) 10000))
-    (println "COUNT" @(:count game-state))))
-
-;; ----------------------------------------
-(def max-score)
-(def min-score)
-
-(defmacro unless-terminal [game-state & body]
-  `(if (.isTerminal (:game ~game-state) (:state ~game-state))
-     (let [my-score#
-           (.getGoal (:game ~game-state)
-                     (:state ~game-state)
-                     (:role ~game-state))
-           opponent-score#
-           (.getGoal (:game ~game-state)
-                     (:state ~game-state)
-                     (:opponent-role ~game-state))]
-       (log ~game-state "GOAL " (:role ~game-state) "=" my-score#
-            " " (:opponent-role ~game-state) "=" opponent-score#)
-       my-score#)
-     (do
-       ~@body)))
-
-;; (defn max-shortcut [current-max values]
-;;   (if (or (>= current-max 100)
-;;           (not (seq values)))
-;;     current-max
-;;     (recur (max current-max (first values))
-;;            (rest values))))
-
-;; (defn min-shortcut [current-min values]
-;;   (if (or (<= current-min 0)
-;;           (not (seq values)))
-;;     current-min
-;;     (recur (min current-min (first values))
-;;            (rest values))))
-
-(defn min-score [alpha beta game-state]
+(defn bounded-dfs [game-state]
   (bump! game-state)
-  (log game-state "MIN" alpha beta (:last-actions game-state))
+  (log game-state "DFS"
+       (str (:depth game-state) "/" (:max-depth game-state))
+       (str "[" (terminal-score game-state) "]"))
+  (cond
+   (terminal? game-state)
+   (dfs-terminal game-state) ;; really just should call goal, not heuristic?
 
-  (logging-depth
-   [game-state "MIN VAL"]
-   (unless-terminal game-state
-     (let [make-move #(move game-state (:opponent-role game-state) %)]
-       (loop [beta beta
-              next-moves (opponent-legal-moves game-state)]
-         (cond
-          (<= beta alpha) beta
-          (empty? next-moves) beta
-          :else (recur (min beta (max-score alpha beta (make-move (first next-moves))))
-                       (rest next-moves))))))))
+   (hit-max-depth game-state)
+   (dfs-terminal game-state)
 
+   :else
+   (dfs-explore game-state)))
 
-(defn max-score [alpha beta game-state]
-  (bump! game-state)
-  (log game-state "MAX" alpha beta (:last-actions game-state))
+(defn heuristic1 [game-state]
+  (or (terminal-score game-state) 0))
 
-  (logging-depth [game-state "MAX VAL"]
-                 (unless-terminal game-state
-    (let [make-move #(move game-state (:role game-state) %)]
-      (loop [alpha alpha
-             next-moves (my-legal-moves game-state)]
-        (cond
-         (<= beta alpha) alpha
-         (empty? next-moves) alpha
-         :else (recur (max alpha (min-score alpha beta (make-move (first next-moves))))
-                      (rest next-moves))))))))
+(defn heuristic2 [game-state]
+  (.getGoal (:game game-state)
+            (:state game-state)
+            (:role game-state)))
 
-
-(defn best-move [game-state]
-  (let [actions (my-legal-moves game-state)]
-    (if (= 1 (count actions))
-      (first actions)
-      (let [make-move #(move game-state (:role game-state) %)]
-        (loop [alpha 0
-               beta 100
-               my-move nil
-               next-moves (my-legal-moves game-state)]
-          (cond
-           (<= beta alpha) my-move
-           (empty? next-moves) my-move
-           :else (let [leaf-score (min-score alpha beta (make-move (first next-moves)))]
-                   (if (> leaf-score alpha)
-                     (recur leaf-score beta (first next-moves) (rest next-moves))
-                     (recur alpha beta my-move (rest next-moves))))))))))
-
-(defn test-solve [game]
-  (let [counter (atom 0)
-        initial-state {:game game
-                       :state (.getInitialState game)
-                       :count counter
-                       :role (first (.getRoles game))
-                       :opponent-role (second (.getRoles game))}
-        move (best-move initial-state)]
-    (println "SELECTING" (:role initial-state) move "after" @counter "nodes")
-    move))
 
 (defn week6-player1 []
   (proxy [StateMachineGamer] []
@@ -163,11 +82,17 @@
       (let [counter (atom 0)
             initial-state {:game (.getStateMachine this)
                            :state (.getCurrentState this)
+                           :depth 0
+                           :print-depth 2
+                           :max-depth 4
+                           :heuristic heuristic2
                            :count counter
-                           :role (.getRole this)
-                           :opponent-role (find-opponent (.getStateMachine this) (.getRole this))}
-            move (best-move initial-state)]
-        (println "SELECTING" (:role initial-state) move "after" @counter "nodes")
+                           :role (.getRole this)}
+            scored (bounded-dfs initial-state)
+            _ (println "!!! legal moves are" (my-legal-moves initial-state))
+            move (:score-action scored)] ;; single player
+        (println "SELECTING" (:role initial-state) move "with score" (:score scored)
+                 "after" @counter "nodes")
         move))
 
     (stateMachineMetaGame [timeout]
@@ -179,4 +104,8 @@
     (stateMachineStop []
       (println "SampleClojureGamer stop called"))))
 
-
+(println "XXX loading w6p1")
+;; ----------------------------------------
+;; this still needs some work..
+#_(defn start []
+    (player/start (week6-player1)))
